@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace InteligencjaObliczeniowa
+namespace TravelingSalesmanProblem
 {
     internal class NearestNeighbour
     {
@@ -82,6 +82,31 @@ namespace InteligencjaObliczeniowa
             }
 
             return (path, totalDistance);
+        }
+
+        public static void MakeNearestNeighbourAlgorithm(double[,] data, int citiesCount)
+        {
+            List<int> bestPath = new();
+            double bestDistance = double.MaxValue;
+
+            // foreach starting city 
+            for (int i = 0; i < citiesCount; i++)
+            {
+                List<int> currentPath = new List<int>();
+                double currentTotalDistance = 0;
+                (currentPath, currentTotalDistance) = NearestNeighbour.NearestNeighbourTSP(data, i);
+                if (currentTotalDistance < bestDistance)
+                {
+                    bestPath = currentPath;
+                    bestDistance = currentTotalDistance;
+                }
+            }
+            Console.WriteLine("Best path found:");
+            foreach (var city in bestPath)
+            {
+                Console.Write($"{city} -> ");
+            }
+            Console.WriteLine("Best (lowest) distance: " + bestDistance);
         }
     }
 }

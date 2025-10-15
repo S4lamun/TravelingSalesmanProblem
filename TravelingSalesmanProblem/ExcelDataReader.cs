@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ClosedXML.Excel;
 
-namespace InteligencjaObliczeniowa
+namespace TravelingSalesmanProblem
 {
     internal class ExcelDataReader
     {

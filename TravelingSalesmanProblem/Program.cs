@@ -13,34 +13,56 @@ namespace TravelingSalesmanProblem
             double[,] dataCities76 = ExcelDataReader.ReadDataToMatrix(_cities76);
             double[,] dataCities127 = ExcelDataReader.ReadDataToMatrix(_cities127);
 
-          MakeNearestNeighbourAlgorithm(dataCities76, dataCities76.GetLength(0));
+            // Nearest Neighbour Algorithm
+            //NearestNeighbour.MakeNearestNeighbourAlgorithm(dataCities48, dataCities127.GetLength(0));
+            //NearestNeighbour.MakeNearestNeighbourAlgorithm(dataCities76, dataCities127.GetLength(0));
+            //NearestNeighbour.MakeNearestNeighbourAlgorithm(dataCities127, dataCities127.GetLength(0));
+
+            // Hill Climbing Algorithm
+            HillClimbingAlgorithm(dataCities48, 1000, "SWAP");
         }
 
-        public static void MakeNearestNeighbourAlgorithm(double[,] data, int citiesCount)
+
+        public static void HillClimbingAlgorithm(double[,] dataCities, int maxIterations, string method)
         {
-            List<int> bestPath = new();
-            double bestDistance = double.MaxValue;
+            HillClimbingTsp tspSolver = new HillClimbingTsp(dataCities);
 
-            // foreach starting city 
-            for (int i = 0; i < citiesCount; i++)
+            Console.WriteLine("\n--- Rozwiązywanie problemu komiwojażera algorytmem Hill Climbing z różnymi ruchami ---\n");
+
+            if (method == "SWAP")
             {
-                List<int> currentPath = new List<int>();
-                double currentTotalDistance = 0;
-                (currentPath, currentTotalDistance) = NearestNeighbour.NearestNeighbourTSP(data, i);
-                if (currentTotalDistance<bestDistance)
-                {
-                    bestPath = currentPath;
-                    bestDistance = currentTotalDistance;
-                }
+                HillClimbing bestSwapRoute = tspSolver.SolveTsp(tspSolver.ApplySwap, maxIterations);
+                Console.WriteLine($"\nFinal Best Route (Swap): {bestSwapRoute}");
+                Console.WriteLine(new string('-', 50));
             }
-            Console.WriteLine("Best path found:");
-            foreach (var city in bestPath)
+            else if (method == "INSERT")
             {
-                Console.Write($"{city} -> ");
+                HillClimbing bestSwapRoute = tspSolver.SolveTsp(tspSolver.ApplyInsert, maxIterations);
+                Console.WriteLine($"\nFinal Best Route (Swap): {bestSwapRoute}");
+                Console.WriteLine(new string('-', 50));
             }
-            Console.WriteLine("Best (lowest) distance: " + bestDistance);
+            else if (method == "REVERSE")
+            {
+                HillClimbing bestSwapRoute = tspSolver.SolveTsp(tspSolver.ApplyReverse, maxIterations);
+                Console.WriteLine($"\nFinal Best Route (Swap): {bestSwapRoute}");
+                Console.WriteLine(new string('-', 50));
+            }
+            else
+            {
+                Console.WriteLine("Invalid method specified. Please choose SWAP, INSERT, or REVERSE.");
+                return;
+            }
+
+            // 2. Insert
+            HillClimbing bestInsertRoute = tspSolver.SolveTsp(tspSolver.ApplyInsert, maxIterations);
+            Console.WriteLine($"\nFinal Best Route (Insert): {bestInsertRoute}");
+            Console.WriteLine(new string('-', 50));
+
+            // 3. Reverse (2-opt-like)
+            HillClimbing bestReverseRoute = tspSolver.SolveTsp(tspSolver.ApplyReverse, maxIterations);
+            Console.WriteLine($"\nFinal Best Route (Reverse): {bestReverseRoute}");
+            Console.WriteLine(new string('-', 50));
         }
-
         public static void PrintData(double[,] matrix)
         {
             int rows = matrix.GetLength(0);
