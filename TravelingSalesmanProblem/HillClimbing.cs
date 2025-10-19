@@ -4,28 +4,6 @@ using System.Linq;
 
 namespace TravelingSalesmanProblem
 {
-    public class HillClimbing
-    {
-        public List<int> Cities { get; set; } // Cities in the route
-        public double Cost { get; set; }      // Cost of the route
-
-        public HillClimbing(List<int> cities, double cost)
-        {
-            Cities = cities;
-            Cost = cost;
-        }
-
-        public HillClimbing Clone()
-        {
-            return new HillClimbing(new List<int>(Cities), Cost);
-        }
-
-        public override string ToString()
-        {
-            return $"Route: {string.Join(" -> ", Cities)} (Cost: {Cost:F2})";
-        }
-    }
-
     public class HillClimbingTsp
     {
         private readonly double[,] _distanceMatrix;
@@ -39,8 +17,8 @@ namespace TravelingSalesmanProblem
             _random = new Random();
         }
 
-        // 1. Function of total Cost
-        public double CalculateCost(List<int> route)
+        // 1. Funkcja obliczająca całkowity koszt (przeniesiona z TSP, aby miała dostęp do macierzy)
+        private double CalculateCost(List<int> route)
         {
             double cost = 0;
             for (int i = 0; i < _numCities; i++)
@@ -48,36 +26,37 @@ namespace TravelingSalesmanProblem
                 int currentCity = route[i];
                 int nextCity = route[(i + 1) % _numCities];
 
+                // Zakładamy, że macierz jest symetryczna (distanceMatrix[i, j] == distanceMatrix[j, i])
                 cost += _distanceMatrix[currentCity, nextCity];
             }
             return cost;
         }
 
-        // 2. Generating intial solve
-        public HillClimbing GenerateInitialRoute()
+        // 2. Generowanie początkowego rozwiązania (przeniesiona z TSP)
+        public TSP GenerateInitialRoute()
         {
             List<int> cities = Enumerable.Range(0, _numCities).ToList();
 
-            // Randomizing city list
+            // Randomizing city list (Fisher-Yates shuffle)
             for (int i = 0; i < _numCities; i++)
             {
                 int j = _random.Next(i, _numCities);
-                (cities[i], cities[j]) = (cities[j], cities[i]); // Swap
+                // Użycie krotki do zamiany (Swap)
+                (cities[i], cities[j]) = (cities[j], cities[i]);
             }
 
             double cost = CalculateCost(cities);
-            return new HillClimbing(cities, cost);
+            return new TSP(cities, cost);
         }
 
-        // 3. Different mutation operators to generate neighboring solutions
+        // 3. Różne operatory mutacji do generowania sąsiednich rozwiązań
 
-        // a) Swap 
-        // Randomly select two different positions and swap the cities at these positions.
-        public HillClimbing ApplySwap(HillClimbing currentRoute)
+        // a) Swap (Zamiana)
+        public TSP ApplySwap(TSP currentRoute)
         {
             var newRouteCities = currentRoute.Cities.ToList();
 
-            // Randomizing two cities
+            // Randomly select two cities
             int i = _random.Next(_numCities);
             int j = _random.Next(_numCities);
             while (i == j)
@@ -89,12 +68,11 @@ namespace TravelingSalesmanProblem
             (newRouteCities[i], newRouteCities[j]) = (newRouteCities[j], newRouteCities[i]);
 
             double newCost = CalculateCost(newRouteCities);
-            return new HillClimbing(newRouteCities, newCost);
+            return new TSP(newRouteCities, newCost);
         }
 
-        // b) Insert 
-        // Random select one city and insert it into a different position.
-        public HillClimbing ApplyInsert(HillClimbing currentRoute)
+        // b) Insert (Wstawienie)
+        public TSP ApplyInsert(TSP currentRoute)
         {
             var newRouteCities = currentRoute.Cities.ToList();
 
@@ -103,71 +81,84 @@ namespace TravelingSalesmanProblem
             int destIndex = _random.Next(_numCities);
 
             if (sourceIndex == destIndex)
-                return currentRoute.Clone(); 
+                return currentRoute.Clone(); // Wracamy do oryginału, jeśli indeksy są identyczne
 
             int cityToMove = newRouteCities[sourceIndex];
-            newRouteCities.RemoveAt(sourceIndex); // Deleting on source position
-            newRouteCities.Insert(destIndex, cityToMove); // Inserting on new position
+            newRouteCities.RemoveAt(sourceIndex); // Usuwamy z pozycji źródłowej
+            newRouteCities.Insert(destIndex, cityToMove); // Wstawiamy na nowej pozycji
 
             double newCost = CalculateCost(newRouteCities);
-            return new HillClimbing(newRouteCities, newCost);
+            return new TSP(newRouteCities, newCost);
         }
 
         // c) Reverse (2-opt)
-        // 2-opt: Randomly select two different positions and reverse the order of cities between these positions.
-        public HillClimbing ApplyReverse(HillClimbing currentRoute)
+        public TSP ApplyReverse(TSP currentRoute)
         {
             var newRouteCities = currentRoute.Cities.ToList();
+            int numCities = newRouteCities.Count;
 
-            // Randomly select two cities 
-            int i = _random.Next(_numCities);
-            int j = _random.Next(_numCities);
+            // Losujemy dwa różne indeksy
+            int i = _random.Next(numCities);
+            int j = _random.Next(numCities);
 
-            // Upewniamy się, że i jest mniejsze niż j
+            // Upewniamy się, że i != j
+            while (i == j)
+            {
+                j = _random.Next(numCities);
+            }
+
+            // Upewniamy się, że i jest zawsze mniejsze niż j
             if (i > j)
             {
-                (i, j) = (j, i); // Swap
+                (i, j) = (j, i); // Zamiana
             }
-            if (i == j) 
-                return currentRoute.Clone();
 
-            // Reversing route from i to j
+            // i jest teraz mniejsze niż j
+
+            // Odwracamy segment listy ZACZYNAJĄC od indeksu 'i'
+            // o długości 'j - i + 1' (aby objąć element 'j' włącznie)
             newRouteCities.Reverse(i, j - i + 1);
 
             double newCost = CalculateCost(newRouteCities);
-            return new HillClimbing(newRouteCities, newCost);
+            return new TSP(newRouteCities, newCost);
         }
 
-        // 4. Main Hill Climbing algorithm
-        public HillClimbing SolveTsp(Func<HillClimbing, HillClimbing> mutationOperator, int maxIterations = 1000, int maxStagnation=100)
+        // 4. Główny algorytm Hill Climbing (logika bez zmian)
+        public TSP SolveTsp(Func<TSP, TSP> mutationOperator, int maxIterations = 1000, int maxStagnation = 100)
         {
-            // Generating intial Route
-            HillClimbing currentBestRoute = GenerateInitialRoute();
-            Console.WriteLine($"Starting Hill Climbing with {mutationOperator.Method.Name}. Initial Cost: {currentBestRoute.Cost:F2}");
+            // Generating intial Route (teraz wywołuje metodę tej klasy)
+            TSP currentBestRoute = GenerateInitialRoute();
+
+            // Pobieramy nazwę metody dla celów diagnostycznych
+            string methodName = mutationOperator.Method.Name.Replace("Apply", "");
+
+            Console.WriteLine($"Starting Hill Climbing with {methodName}. Initial Cost: {currentBestRoute.Cost:F2}");
 
             int iteration = 0;
-            int stagnationCounter = 0; 
+            int stagnationCounter = 0;
 
             while (iteration < maxIterations && stagnationCounter < maxStagnation)
             {
                 // Generating neighbour solution
-                HillClimbing neighborRoute = mutationOperator(currentBestRoute);
+                // Uwaga: mutationOperator to delegat, który MUSI być związany z instancją klasy HillClimbingTsp
+                // (np. tspSolver.ApplySwap), aby mieć dostęp do macierzy odległości.
+                TSP neighborRoute = mutationOperator(currentBestRoute);
 
                 // Hill Climbing alghorithm - accepting only better solutions
-                if (neighborRoute.Cost < currentBestRoute.Cost) 
+                if (neighborRoute.Cost < currentBestRoute.Cost)
                 {
                     currentBestRoute = neighborRoute;
-                    stagnationCounter = 0; 
+                    stagnationCounter = 0;
                 }
                 else
                 {
-                    stagnationCounter++; 
+                    stagnationCounter++;
                 }
 
                 iteration++;
             }
 
-            Console.WriteLine($"Hill Climbing with {mutationOperator.Method.Name} finished after {iteration} iterations.");
+            Console.WriteLine($"Hill Climbing with {methodName} finished after {iteration} iterations.");
             return currentBestRoute;
         }
     }
