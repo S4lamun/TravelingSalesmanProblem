@@ -37,25 +37,41 @@ namespace TravelingSalesmanProblem
         #region HillClimbingAlgorithm
         public static (TSP bestRoute, TimeSpan duration) RunHillClimbingAlgorithm(double[,] dataCities, int maxIterations, string method, int maxStagnation)
         {
-            // Ta sekcja wymaga istniejącej klasy HillClimbingTsp
-            // HillClimbingTsp tspSolver = new HillClimbingTsp(dataCities);
+            HillClimbingTsp tspSolver = new HillClimbingTsp(dataCities);
             Stopwatch stopwatch = new Stopwatch();
-            TSP bestRoute = null; // Zastąp to inicjalizacją wynikającą z algorytmu
+            TSP bestRoute = null; 
 
             Console.WriteLine($"\n--- Running Hill Climbing: Method={method}, Iterations={maxIterations}, Stagnation={maxStagnation} ---");
 
+            Func<TSP, TSP> mutationOperator;
+            if (method == "SWAP")
+            {
+                mutationOperator = tspSolver.ApplySwap;
+            }
+            else if (method == "INSERT")
+            {
+                mutationOperator = tspSolver.ApplyInsert;
+            }
+            else if (method == "REVERSE")
+            {
+                mutationOperator = tspSolver.ApplyReverse;
+            }
+            else
+            {
+                throw new ArgumentException($"Nieznana metoda dla Hill Climbing: {method}");
+            }
+
             stopwatch.Start();
 
-            // --- Logika wywołania HC ---
-            // if (method == "SWAP") bestRoute = tspSolver.SolveTsp(tspSolver.ApplySwap, maxIterations, maxStagnation);
-            // else if (method == "INSERT") bestRoute = tspSolver.SolveTsp(tspSolver.ApplyInsert, maxIterations, maxStagnation);
-            // else if (method == "REVERSE") bestRoute = tspSolver.SolveTsp(tspSolver.ApplyReverse, maxIterations, maxStagnation);
-            // else { /* error handling */ }
-
-            // Wersja DUMMY:
-            bestRoute = new TSP(Enumerable.Range(0, dataCities.GetLength(0)).ToList(), new Random().NextDouble() * 1000);
+            bestRoute = tspSolver.SolveTsp(mutationOperator, maxIterations, maxStagnation);
 
             stopwatch.Stop();
+
+            if (bestRoute == null)
+            {
+                Console.WriteLine($"\n--- Błąd: Algorytm HC nie zwrócił trasy dla metody {method} ---");
+                bestRoute = tspSolver.GenerateInitialRoute();
+            }
 
             Console.WriteLine($"Final Best Route ({method}): {bestRoute.Cost:F2}");
             Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalMilliseconds:F2} ms");
@@ -119,7 +135,7 @@ namespace TravelingSalesmanProblem
                                     {
                                         Method = method,
                                         MaxIterations = iteration,
-                                        MaxStagnation = stagnation, // Teraz jest w ResultData
+                                        MaxStagnation = stagnation, 
                                         RouteCost = bestResultRoute.Cost,
                                         ExecutionTimeMs = averageTimeMs
                                     });
@@ -129,10 +145,9 @@ namespace TravelingSalesmanProblem
                     }
                     Console.WriteLine($"\n===== FINISHED HC TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
 
-                    // --- Writing results for the current dataset to a new worksheet ---
+
                     var worksheet = workbook.Worksheets.Add($"HC_Results_{datasetName}");
 
-                    // Użycie InsertTable
                     worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
                     {
                         r.Method,
@@ -142,12 +157,10 @@ namespace TravelingSalesmanProblem
                         ExecutionTimeMs = r.ExecutionTimeMs
                     }));
 
-                    // Style headers
                     var headerRange = worksheet.Range(1, 1, 1, 5);
                     headerRange.Style.Font.Bold = true;
                     headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
 
-                    // Adjust column widths
                     worksheet.Columns().AdjustToContents();
                 }
 
@@ -168,7 +181,6 @@ namespace TravelingSalesmanProblem
 
             stopwatch.Start();
 
-            // Ta sekcja wymaga istniejącej, statycznej klasy SimulatedAnnealing z metodą SolveTSP
             TSP bestRoute = SimulatedAnnealing.SolveTSP(dataCities, initialTemperature, coolingRate,
                 solutionsPerTemperature, maxIterations, moveMethod);
 
@@ -180,9 +192,9 @@ namespace TravelingSalesmanProblem
             return (bestRoute, stopwatch.Elapsed);
         }
 
+
         public static void TestSimulatedAnnealing()
         {
-            // PARAMETRYZACJA DLA SIMULATED ANNEALING
             double[] initialTemperatures = { 1000.0, 500.0, 200.0 };
             double[] coolingRates = { 0.99, 0.999, 0.95 };
             int[] solutionsPerTemperature = { 10, 50, 100 };
@@ -267,10 +279,8 @@ namespace TravelingSalesmanProblem
                     }
                     Console.WriteLine($"\n===== FINISHED SA TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
 
-                    // --- Writing results to a new worksheet ---
                     var worksheet = workbook.Worksheets.Add($"SA_Results_{datasetName}");
 
-                    // Użycie InsertTable
                     worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
                     {
                         r.Method,
@@ -282,12 +292,10 @@ namespace TravelingSalesmanProblem
                         AvgExecutionTimeMs = r.ExecutionTimeMs
                     }));
 
-                    // Stylizowanie nagłówków
                     var headerRange = worksheet.Range(1, 1, 1, 7);
                     headerRange.Style.Font.Bold = true;
                     headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
 
-                    // Dostosowanie szerokości kolumn
                     worksheet.Columns().AdjustToContents();
                 }
 
