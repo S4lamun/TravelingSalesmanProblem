@@ -68,6 +68,7 @@ namespace TravelingSalesmanProblem
                 }
                 else
                 {
+                    // This should not happen in a complete graph, but good to have
                     Console.WriteLine("Cannot find next unvisited city");
                     break;
                 }
@@ -84,7 +85,10 @@ namespace TravelingSalesmanProblem
             return (path, totalDistance);
         }
 
-        public static void MakeNearestNeighbourAlgorithm(double[,] data, int citiesCount)
+        // --- ZMODYFIKOWANA METODA ---
+        // Zmieniłem typ zwracany z 'void' na '(List<int> BestPath, double BestDistance)'
+        // Usunąłem wypisywanie na konsolę - zajmie się tym klasa Program.
+        public static (List<int> BestPath, double BestDistance) MakeNearestNeighbourAlgorithm(double[,] data, int citiesCount)
         {
             List<int> bestPath = new();
             double bestDistance = double.MaxValue;
@@ -101,12 +105,9 @@ namespace TravelingSalesmanProblem
                     bestDistance = currentTotalDistance;
                 }
             }
-            Console.WriteLine("Best path found:");
-            foreach (var city in bestPath)
-            {
-                Console.Write($"{city} -> ");
-            }
-            Console.WriteLine("Best (lowest) distance: " + bestDistance);
+
+            // Zwracamy wyniki zamiast je wypisywać
+            return (bestPath, bestDistance);
         }
     }
 }

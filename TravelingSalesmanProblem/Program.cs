@@ -17,8 +17,9 @@ namespace TravelingSalesmanProblem
         static double[,] dataCities76;
         static double[,] dataCities127;
 
-        static Program() 
+        static Program()
         {
+            // Zakładam, że masz klasę ExcelDataReader
             dataCities48 = ExcelDataReader.ReadDataToMatrix(_cities48);
             dataCities76 = ExcelDataReader.ReadDataToMatrix(_cities76);
             dataCities127 = ExcelDataReader.ReadDataToMatrix(_cities127);
@@ -26,9 +27,12 @@ namespace TravelingSalesmanProblem
 
         public static void Main(string[] args)
         {
-            TestSimulatedAnnealing();
+            TestNearestNeighbour();
 
-            // TestHillCLimbingRafal(); 
+            // TestHillCLimbing(); 
+
+            // TestSimulatedAnnealing();
+
 
             Console.WriteLine("\nPress any key to exit.");
             Console.ReadKey();
@@ -39,7 +43,7 @@ namespace TravelingSalesmanProblem
         {
             HillClimbingTsp tspSolver = new HillClimbingTsp(dataCities);
             Stopwatch stopwatch = new Stopwatch();
-            TSP bestRoute = null; 
+            TSP bestRoute = null;
 
             Console.WriteLine($"\n--- Running Hill Climbing: Method={method}, Iterations={maxIterations}, Stagnation={maxStagnation} ---");
 
@@ -135,7 +139,7 @@ namespace TravelingSalesmanProblem
                                     {
                                         Method = method,
                                         MaxIterations = iteration,
-                                        MaxStagnation = stagnation, 
+                                        MaxStagnation = stagnation,
                                         RouteCost = bestResultRoute.Cost,
                                         ExecutionTimeMs = averageTimeMs
                                     });
@@ -173,7 +177,7 @@ namespace TravelingSalesmanProblem
 
         #region SimulatedAnnealingAlgorithm
         public static (TSP bestRoute, TimeSpan duration) RunSimulatedAnnealingAlgorithm(double[,] dataCities, double initialTemperature, double coolingRate,
-            int solutionsPerTemperature, int maxIterations, MoveTypeEnum moveMethod) 
+            int solutionsPerTemperature, int maxIterations, MoveTypeEnum moveMethod)
         {
             Stopwatch stopwatch = new Stopwatch();
 
@@ -199,13 +203,13 @@ namespace TravelingSalesmanProblem
             double[] coolingRates = { 0.99, 0.999, 0.95 };
             int[] solutionsPerTemperature = { 10, 50, 100 };
             int maxIterations = 1000;
-            const int MultiStartCount = 5;
+            const int MultiStartCount = 10;
 
             var moveMethodMap = new Dictionary<string, MoveTypeEnum>
             {
                 { "SWAP", MoveTypeEnum.Swap },
                 { "INSERT", MoveTypeEnum.Insert },
-                { "REVERSE", MoveTypeEnum.Revert } 
+                { "REVERSE", MoveTypeEnum.Revert }
             };
             string[] methods = moveMethodMap.Keys.ToArray();
 
@@ -307,6 +311,117 @@ namespace TravelingSalesmanProblem
 
         #endregion
 
+        // --- NOWY REGION ---
+        #region NearestNeighbourAlgorithm
+
+        /// <summary>
+        /// Uruchamia algorytm Najbliższego Sąsiada (NN) i mierzy czas wykonania.
+        /// </summary>
+        public static (List<int> bestPath, double bestCost, TimeSpan duration) RunNearestNeighbourAlgorithm(double[,] dataCities)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+            int citiesCount = dataCities.GetLength(0);
+
+            Console.WriteLine($"\n--- Running Nearest Neighbour ({citiesCount} cities) ---");
+
+            stopwatch.Start();
+
+            // Wywołujemy zmodyfikowaną metodę statyczną z klasy NearestNeighbour
+            var (bestPath, bestCost) = NearestNeighbour.MakeNearestNeighbourAlgorithm(dataCities, citiesCount);
+
+            stopwatch.Stop();
+
+            // Wypisujemy ścieżkę i koszt
+            Console.WriteLine("Best path found (NN):");
+            Console.WriteLine(string.Join(" -> ", bestPath));
+            Console.WriteLine($"Final Best Route (NN): {bestCost:F2}");
+            Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalMilliseconds:F2} ms");
+
+            return (bestPath, bestCost, stopwatch.Elapsed);
+        }
+
+        /// <summary>
+        /// Testuje algorytm NN dla wszystkich zestawów danych i zapisuje wyniki do Excela.
+        /// </summary>
+        public static void TestNearestNeighbour()
+        {
+            // Uruchamiamy 10 razy, aby uzyskać stabilny średni czas wykonania.
+            // Koszt będzie taki sam, ponieważ algorytm jest deterministyczny.
+            const int MultiStartCount = 10;
+
+            var datasets = new Dictionary<string, double[,]>
+            {
+                { "48_Cities", dataCities48 },
+                { "76_Cities", dataCities76 },
+                { "127_Cities", dataCities127 }
+            };
+
+            string fileName = "NearestNeighbour_Results.xlsx";
+            using (var workbook = new XLWorkbook())
+            {
+                foreach (var datasetEntry in datasets)
+                {
+                    string datasetName = datasetEntry.Key;
+                    double[,] cityData = datasetEntry.Value;
+
+                    // Lista będzie zawierać tylko 1 wpis dla każdego zestawu danych
+                    var allResults = new List<ResultData>();
+
+                    Console.WriteLine($"\n===== STARTING NN TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    double bestResultCost = double.MaxValue;
+                    double totalTimeMs = 0;
+
+                    for (int i = 0; i < MultiStartCount; i++)
+                    {
+                        var (path, cost, duration) = RunNearestNeighbourAlgorithm(cityData);
+                        totalTimeMs += duration.TotalMilliseconds;
+
+                        // Koszt będzie zawsze ten sam, ale dla pewności przypisujemy go raz
+                        if (cost < bestResultCost)
+                        {
+                            bestResultCost = cost;
+                        }
+                    }
+
+                    double averageTimeMs = totalTimeMs / MultiStartCount;
+
+                    // Dodajemy pojedynczy zagregowany wynik
+                    allResults.Add(new ResultData
+                    {
+                        Method = "NearestNeighbour",
+                        RouteCost = bestResultCost,
+                        ExecutionTimeMs = averageTimeMs
+                    });
+
+                    Console.WriteLine($"\n===== FINISHED NN TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+                    Console.WriteLine($"-> Best Cost: {bestResultCost:F2}, Avg Time: {averageTimeMs:F2} ms\n");
+
+                    // Tworzenie arkusza Excel
+                    var worksheet = workbook.Worksheets.Add($"NN_Results_{datasetName}");
+
+                    // Wstawiamy dane do tabeli (tylko 3 kolumny)
+                    worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
+                    {
+                        Algorithm = r.Method,
+                        FinalRouteCost = r.RouteCost,
+                        AvgExecutionTimeMs = r.ExecutionTimeMs
+                    }));
+
+                    var headerRange = worksheet.Range(1, 1, 1, 3); // Dopasowujemy do 3 kolumn
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    worksheet.Columns().AdjustToContents();
+                }
+
+                workbook.SaveAs(fileName);
+            }
+
+            Console.WriteLine($"\nAll NN results have been successfully saved to '{fileName}'");
+        }
+
+        #endregion
 
 
         public static void PrintData(double[,] matrix)
