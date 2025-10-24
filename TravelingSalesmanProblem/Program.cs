@@ -27,16 +27,130 @@ namespace TravelingSalesmanProblem
 
         public static void Main(string[] args)
         {
-            TestNearestNeighbour();
+            // TestNearestNeighbour();
 
             // TestHillCLimbing(); 
 
             // TestSimulatedAnnealing();
 
+            // TestTabuSearch();
+
+
+            //Odpala to Kazik: 
+            // Po skończeniu szukajcie pliku: TabuSearchKazik_Results.xlsx (wyślij go mi na messanger)
+           // TestTabuSearchKazik();
+
+            //Odpala to Rafał:
+            // Po skończeniu szukajcie pliku: TabuSearchRafal_Results.xlsx (wyślij go mi na messanger)
+            //TestTabuSearchRafal();
 
             Console.WriteLine("\nPress any key to exit.");
             Console.ReadKey();
         }
+
+
+        #region NearestNeighbourAlgorithm
+
+        public static (List<int> bestPath, double bestCost, TimeSpan duration) RunNearestNeighbourAlgorithm(double[,] dataCities)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+            int citiesCount = dataCities.GetLength(0);
+
+            Console.WriteLine($"\n--- Running Nearest Neighbour ({citiesCount} cities) ---");
+
+            stopwatch.Start();
+
+            // Wywołujemy zmodyfikowaną metodę statyczną z klasy NearestNeighbour
+            var (bestPath, bestCost) = NearestNeighbour.MakeNearestNeighbourAlgorithm(dataCities, citiesCount);
+
+            stopwatch.Stop();
+
+            // Wypisujemy ścieżkę i koszt
+            Console.WriteLine("Best path found (NN):");
+            Console.WriteLine(string.Join(" -> ", bestPath));
+            Console.WriteLine($"Final Best Route (NN): {bestCost:F2}");
+            Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalMilliseconds:F2} ms");
+
+            return (bestPath, bestCost, stopwatch.Elapsed);
+        }
+        public static void TestNearestNeighbour()
+        {
+            const int MultiStartCount = 10;
+
+            var datasets = new Dictionary<string, double[,]>
+            {
+                { "48_Cities", dataCities48 },
+                { "76_Cities", dataCities76 },
+                { "127_Cities", dataCities127 }
+            };
+
+            string fileName = "NearestNeighbour_Results.xlsx";
+            using (var workbook = new XLWorkbook())
+            {
+                foreach (var datasetEntry in datasets)
+                {
+                    string datasetName = datasetEntry.Key;
+                    double[,] cityData = datasetEntry.Value;
+
+                    // Lista będzie zawierać tylko 1 wpis dla każdego zestawu danych
+                    var allResults = new List<ResultData>();
+
+                    Console.WriteLine($"\n===== STARTING NN TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    double bestResultCost = double.MaxValue;
+                    double totalTimeMs = 0;
+
+                    for (int i = 0; i < MultiStartCount; i++)
+                    {
+                        var (path, cost, duration) = RunNearestNeighbourAlgorithm(cityData);
+                        totalTimeMs += duration.TotalMilliseconds;
+
+                        // Koszt będzie zawsze ten sam, ale dla pewności przypisujemy go raz
+                        if (cost < bestResultCost)
+                        {
+                            bestResultCost = cost;
+                        }
+                    }
+
+                    double averageTimeMs = totalTimeMs / MultiStartCount;
+
+                    // Dodajemy pojedynczy zagregowany wynik
+                    allResults.Add(new ResultData
+                    {
+                        Method = "NearestNeighbour",
+                        RouteCost = bestResultCost,
+                        ExecutionTimeMs = averageTimeMs
+                    });
+
+                    Console.WriteLine($"\n===== FINISHED NN TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+                    Console.WriteLine($"-> Best Cost: {bestResultCost:F2}, Avg Time: {averageTimeMs:F2} ms\n");
+
+                    // Tworzenie arkusza Excel
+                    var worksheet = workbook.Worksheets.Add($"NN_Results_{datasetName}");
+
+                    // Wstawiamy dane do tabeli (tylko 3 kolumny)
+                    worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
+                    {
+                        Algorithm = r.Method,
+                        FinalRouteCost = r.RouteCost,
+                        AvgExecutionTimeMs = r.ExecutionTimeMs
+                    }));
+
+                    var headerRange = worksheet.Range(1, 1, 1, 3); // Dopasowujemy do 3 kolumn
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    worksheet.Columns().AdjustToContents();
+                }
+
+                workbook.SaveAs(fileName);
+            }
+
+            Console.WriteLine($"\nAll NN results have been successfully saved to '{fileName}'");
+        }
+
+        #endregion
+
 
         #region HillClimbingAlgorithm
         public static (TSP bestRoute, TimeSpan duration) RunHillClimbingAlgorithm(double[,] dataCities, int maxIterations, string method, int maxStagnation)
@@ -175,6 +289,8 @@ namespace TravelingSalesmanProblem
         }
         #endregion
 
+
+
         #region SimulatedAnnealingAlgorithm
         public static (TSP bestRoute, TimeSpan duration) RunSimulatedAnnealingAlgorithm(double[,] dataCities, double initialTemperature, double coolingRate,
             int solutionsPerTemperature, int maxIterations, MoveTypeEnum moveMethod)
@@ -311,104 +427,127 @@ namespace TravelingSalesmanProblem
 
         #endregion
 
-        // --- NOWY REGION ---
-        #region NearestNeighbourAlgorithm
+      
 
-        /// <summary>
-        /// Uruchamia algorytm Najbliższego Sąsiada (NN) i mierzy czas wykonania.
-        /// </summary>
-        public static (List<int> bestPath, double bestCost, TimeSpan duration) RunNearestNeighbourAlgorithm(double[,] dataCities)
+        #region TabuSearchAlgorithm
+        public static (TSP bestRoute, TimeSpan duration) RunTabuSearchAlgorithm(double[,] dataCities, MoveTypeEnum moveType, int tabuListLength,
+            int maxIterationsWithoutImprovement, int maxIterations)
         {
             Stopwatch stopwatch = new Stopwatch();
-            int citiesCount = dataCities.GetLength(0);
 
-            Console.WriteLine($"\n--- Running Nearest Neighbour ({citiesCount} cities) ---");
+            Console.WriteLine($"\n--- Running Tabu Search: Move={moveType}, TabuLen={tabuListLength}, NoImprove={maxIterationsWithoutImprovement}, TotalIter={maxIterations} ---");
 
             stopwatch.Start();
 
-            // Wywołujemy zmodyfikowaną metodę statyczną z klasy NearestNeighbour
-            var (bestPath, bestCost) = NearestNeighbour.MakeNearestNeighbourAlgorithm(dataCities, citiesCount);
+            // Wywołanie głównej metody algorytmu Tabu Search
+            TSP bestRoute = TabuSearch.SolveTSP(dataCities, moveType, tabuListLength, maxIterationsWithoutImprovement, maxIterations);
 
             stopwatch.Stop();
 
-            // Wypisujemy ścieżkę i koszt
-            Console.WriteLine("Best path found (NN):");
-            Console.WriteLine(string.Join(" -> ", bestPath));
-            Console.WriteLine($"Final Best Route (NN): {bestCost:F2}");
+            Console.WriteLine($"Final Best Route (TS): {bestRoute.Cost:F2}");
             Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalMilliseconds:F2} ms");
+            Console.WriteLine(new string('-', 50));
 
-            return (bestPath, bestCost, stopwatch.Elapsed);
+            return (bestRoute, stopwatch.Elapsed);
         }
 
-        /// <summary>
-        /// Testuje algorytm NN dla wszystkich zestawów danych i zapisuje wyniki do Excela.
-        /// </summary>
-        public static void TestNearestNeighbour()
+       
+        public static void TestTabuSearch()
         {
-            // Uruchamiamy 10 razy, aby uzyskać stabilny średni czas wykonania.
-            // Koszt będzie taki sam, ponieważ algorytm jest deterministyczny.
+            // Parametryzacja algorytmu Tabu Search
+            int[] tabuListLengths = { 10, 20, 50 };
+            int[] maxIterationsWithoutImprovement = { 500, 1000, 2000 };
+            int maxIterations = 10000;
             const int MultiStartCount = 10;
+
+            var moveMethodMap = new Dictionary<string, MoveTypeEnum>
+            {
+                { "SWAP", MoveTypeEnum.Swap },
+                { "INSERT", MoveTypeEnum.Insert },
+                { "REVERSE", MoveTypeEnum.Revert }
+            };
+            string[] methods = moveMethodMap.Keys.ToArray();
 
             var datasets = new Dictionary<string, double[,]>
             {
                 { "48_Cities", dataCities48 },
-                { "76_Cities", dataCities76 },
-                { "127_Cities", dataCities127 }
+                { "76_Cities", dataCities76 },            
             };
 
-            string fileName = "NearestNeighbour_Results.xlsx";
+            string fileName = "TabuSearch_Results.xlsx";
             using (var workbook = new XLWorkbook())
             {
                 foreach (var datasetEntry in datasets)
                 {
                     string datasetName = datasetEntry.Key;
                     double[,] cityData = datasetEntry.Value;
-
-                    // Lista będzie zawierać tylko 1 wpis dla każdego zestawu danych
                     var allResults = new List<ResultData>();
+                    List<int> mockList = Enumerable.Range(0, cityData.GetLength(0)).ToList();
 
-                    Console.WriteLine($"\n===== STARTING NN TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+                    Console.WriteLine($"\n===== STARTING TS TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
 
-                    double bestResultCost = double.MaxValue;
-                    double totalTimeMs = 0;
-
-                    for (int i = 0; i < MultiStartCount; i++)
+                    foreach (var method in methods)
                     {
-                        var (path, cost, duration) = RunNearestNeighbourAlgorithm(cityData);
-                        totalTimeMs += duration.TotalMilliseconds;
-
-                        // Koszt będzie zawsze ten sam, ale dla pewności przypisujemy go raz
-                        if (cost < bestResultCost)
+                        foreach (var tabuLength in tabuListLengths)
                         {
-                            bestResultCost = cost;
+                            foreach (var noImprovementLimit in maxIterationsWithoutImprovement)
+                            {
+                                TSP bestResultRoute = new TSP(mockList, double.MaxValue);
+                                double totalTimeMs = 0;
+
+                                Console.WriteLine($"\n--- Testing: {method}, Tabu={tabuLength}, NoImprove={noImprovementLimit} ---");
+
+                                for (int i = 0; i < MultiStartCount; i++) // Wielokrotny start
+                                {
+                                    var (resultRoute, duration) = RunTabuSearchAlgorithm(
+                                        cityData,
+                                        moveMethodMap[method],
+                                        tabuLength,
+                                        noImprovementLimit,
+                                        maxIterations);
+
+                                    totalTimeMs += duration.TotalMilliseconds;
+
+                                    if (resultRoute != null && bestResultRoute.Cost > resultRoute.Cost)
+                                    {
+                                        bestResultRoute = resultRoute;
+                                    }
+                                }
+
+                                double averageTimeMs = totalTimeMs / MultiStartCount;
+
+                                if (bestResultRoute != null)
+                                {
+                                    allResults.Add(new ResultData
+                                    {
+                                        Method = method,
+                                        TabuListLength = tabuLength,
+                                        MaxStagnation = noImprovementLimit,
+                                        MaxIterations = maxIterations,
+                                        RouteCost = bestResultRoute.Cost,
+                                        ExecutionTimeMs = averageTimeMs
+                                    });
+                                    Console.WriteLine($"\n-> Best Run for M={method}, L={tabuLength}, I={noImprovementLimit}: Cost={bestResultRoute.Cost:F2}, AvgTime={averageTimeMs:F2} ms");
+                                }
+                            }
                         }
                     }
+                    Console.WriteLine($"\n===== FINISHED TS TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
 
-                    double averageTimeMs = totalTimeMs / MultiStartCount;
+                    // Zapis wyników do arkusza Excel
+                    var worksheet = workbook.Worksheets.Add($"TS_Results_{datasetName}");
 
-                    // Dodajemy pojedynczy zagregowany wynik
-                    allResults.Add(new ResultData
-                    {
-                        Method = "NearestNeighbour",
-                        RouteCost = bestResultCost,
-                        ExecutionTimeMs = averageTimeMs
-                    });
-
-                    Console.WriteLine($"\n===== FINISHED NN TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
-                    Console.WriteLine($"-> Best Cost: {bestResultCost:F2}, Avg Time: {averageTimeMs:F2} ms\n");
-
-                    // Tworzenie arkusza Excel
-                    var worksheet = workbook.Worksheets.Add($"NN_Results_{datasetName}");
-
-                    // Wstawiamy dane do tabeli (tylko 3 kolumny)
                     worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
                     {
-                        Algorithm = r.Method,
+                        r.Method,
+                        TabuListLength = r.TabuListLength,
+                        MaxStagnation = r.MaxStagnation,
+                        MaxIterations = r.MaxIterations,
                         FinalRouteCost = r.RouteCost,
                         AvgExecutionTimeMs = r.ExecutionTimeMs
                     }));
 
-                    var headerRange = worksheet.Range(1, 1, 1, 3); // Dopasowujemy do 3 kolumn
+                    var headerRange = worksheet.Range(1, 1, 1, 6);
                     headerRange.Style.Font.Bold = true;
                     headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
 
@@ -418,9 +557,222 @@ namespace TravelingSalesmanProblem
                 workbook.SaveAs(fileName);
             }
 
-            Console.WriteLine($"\nAll NN results have been successfully saved to '{fileName}'");
+            Console.WriteLine($"\nAll TS results have been successfully saved to '{fileName}'");
         }
 
+        public static void TestTabuSearchKazik()
+        {
+            // Parametryzacja algorytmu Tabu Search
+            int[] tabuListLengths = { 10, 20, 50 };
+            int[] maxIterationsWithoutImprovement = { 500  };
+            int maxIterations = 10000;
+            const int MultiStartCount = 10;
+
+            var moveMethodMap = new Dictionary<string, MoveTypeEnum>
+            {
+                { "SWAP", MoveTypeEnum.Swap },
+                { "INSERT", MoveTypeEnum.Insert },
+                { "REVERSE", MoveTypeEnum.Revert }
+            };
+            string[] methods = moveMethodMap.Keys.ToArray();
+
+            var datasets = new Dictionary<string, double[,]>
+            {
+                { "127_Cities", dataCities127 },
+            };
+
+            string fileName = "TabuSearchKazik_Results.xlsx";
+            using (var workbook = new XLWorkbook())
+            {
+                foreach (var datasetEntry in datasets)
+                {
+                    string datasetName = datasetEntry.Key;
+                    double[,] cityData = datasetEntry.Value;
+                    var allResults = new List<ResultData>();
+                    List<int> mockList = Enumerable.Range(0, cityData.GetLength(0)).ToList();
+
+                    Console.WriteLine($"\n===== STARTING TS TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    foreach (var method in methods)
+                    {
+                        foreach (var tabuLength in tabuListLengths)
+                        {
+                            foreach (var noImprovementLimit in maxIterationsWithoutImprovement)
+                            {
+                                TSP bestResultRoute = new TSP(mockList, double.MaxValue);
+                                double totalTimeMs = 0;
+
+                                Console.WriteLine($"\n--- Testing: {method}, Tabu={tabuLength}, NoImprove={noImprovementLimit} ---");
+
+                                for (int i = 0; i < MultiStartCount; i++) // Wielokrotny start
+                                {
+                                    var (resultRoute, duration) = RunTabuSearchAlgorithm(
+                                        cityData,
+                                        moveMethodMap[method],
+                                        tabuLength,
+                                        noImprovementLimit,
+                                        maxIterations);
+
+                                    totalTimeMs += duration.TotalMilliseconds;
+
+                                    if (resultRoute != null && bestResultRoute.Cost > resultRoute.Cost)
+                                    {
+                                        bestResultRoute = resultRoute;
+                                    }
+                                }
+
+                                double averageTimeMs = totalTimeMs / MultiStartCount;
+
+                                if (bestResultRoute != null)
+                                {
+                                    allResults.Add(new ResultData
+                                    {
+                                        Method = method,
+                                        TabuListLength = tabuLength,
+                                        MaxStagnation = noImprovementLimit,
+                                        MaxIterations = maxIterations,
+                                        RouteCost = bestResultRoute.Cost,
+                                        ExecutionTimeMs = averageTimeMs
+                                    });
+                                    Console.WriteLine($"\n-> Best Run for M={method}, L={tabuLength}, I={noImprovementLimit}: Cost={bestResultRoute.Cost:F2}, AvgTime={averageTimeMs:F2} ms");
+                                }
+                            }
+                        }
+                    }
+                    Console.WriteLine($"\n===== FINISHED TS TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    // Zapis wyników do arkusza Excel
+                    var worksheet = workbook.Worksheets.Add($"TS_Results_{datasetName}");
+
+                    worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
+                    {
+                        r.Method,
+                        TabuListLength = r.TabuListLength,
+                        MaxStagnation = r.MaxStagnation,
+                        MaxIterations = r.MaxIterations,
+                        FinalRouteCost = r.RouteCost,
+                        AvgExecutionTimeMs = r.ExecutionTimeMs
+                    }));
+
+                    var headerRange = worksheet.Range(1, 1, 1, 6);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    worksheet.Columns().AdjustToContents();
+                }
+
+                workbook.SaveAs(fileName);
+            }
+
+            Console.WriteLine($"\nAll TS results have been successfully saved to '{fileName}'");
+        }
+
+        public static void TestTabuSearchRafal()
+        {
+            // Parametryzacja algorytmu Tabu Search
+            int[] tabuListLengths = { 10 };
+            int[] maxIterationsWithoutImprovement = { 500, 1000, 2000 };
+            int maxIterations = 10000;
+            const int MultiStartCount = 10;
+
+            var moveMethodMap = new Dictionary<string, MoveTypeEnum>
+            {
+                { "SWAP", MoveTypeEnum.Swap },
+                { "INSERT", MoveTypeEnum.Insert },
+                { "REVERSE", MoveTypeEnum.Revert }
+            };
+            string[] methods = moveMethodMap.Keys.ToArray();
+
+            var datasets = new Dictionary<string, double[,]>
+            {
+                { "127_Cities", dataCities127 }
+            };
+
+            string fileName = "TabuSearchRafal_Results.xlsx";
+            using (var workbook = new XLWorkbook())
+            {
+                foreach (var datasetEntry in datasets)
+                {
+                    string datasetName = datasetEntry.Key;
+                    double[,] cityData = datasetEntry.Value;
+                    var allResults = new List<ResultData>();
+                    List<int> mockList = Enumerable.Range(0, cityData.GetLength(0)).ToList();
+
+                    Console.WriteLine($"\n===== STARTING TS TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    foreach (var method in methods)
+                    {
+                        foreach (var tabuLength in tabuListLengths)
+                        {
+                            foreach (var noImprovementLimit in maxIterationsWithoutImprovement)
+                            {
+                                TSP bestResultRoute = new TSP(mockList, double.MaxValue);
+                                double totalTimeMs = 0;
+
+                                Console.WriteLine($"\n--- Testing: {method}, Tabu={tabuLength}, NoImprove={noImprovementLimit} ---");
+
+                                for (int i = 0; i < MultiStartCount; i++) // Wielokrotny start
+                                {
+                                    var (resultRoute, duration) = RunTabuSearchAlgorithm(
+                                        cityData,
+                                        moveMethodMap[method],
+                                        tabuLength,
+                                        noImprovementLimit,
+                                        maxIterations);
+
+                                    totalTimeMs += duration.TotalMilliseconds;
+
+                                    if (resultRoute != null && bestResultRoute.Cost > resultRoute.Cost)
+                                    {
+                                        bestResultRoute = resultRoute;
+                                    }
+                                }
+
+                                double averageTimeMs = totalTimeMs / MultiStartCount;
+
+                                if (bestResultRoute != null)
+                                {
+                                    allResults.Add(new ResultData
+                                    {
+                                        Method = method,
+                                        TabuListLength = tabuLength,
+                                        MaxStagnation = noImprovementLimit,
+                                        MaxIterations = maxIterations,
+                                        RouteCost = bestResultRoute.Cost,
+                                        ExecutionTimeMs = averageTimeMs
+                                    });
+                                    Console.WriteLine($"\n-> Best Run for M={method}, L={tabuLength}, I={noImprovementLimit}: Cost={bestResultRoute.Cost:F2}, AvgTime={averageTimeMs:F2} ms");
+                                }
+                            }
+                        }
+                    }
+                    Console.WriteLine($"\n===== FINISHED TS TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    // Zapis wyników do arkusza Excel
+                    var worksheet = workbook.Worksheets.Add($"TS_Results_{datasetName}");
+
+                    worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
+                    {
+                        r.Method,
+                        TabuListLength = r.TabuListLength,
+                        MaxStagnation = r.MaxStagnation,
+                        MaxIterations = r.MaxIterations,
+                        FinalRouteCost = r.RouteCost,
+                        AvgExecutionTimeMs = r.ExecutionTimeMs
+                    }));
+
+                    var headerRange = worksheet.Range(1, 1, 1, 6);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    worksheet.Columns().AdjustToContents();
+                }
+
+                workbook.SaveAs(fileName);
+            }
+
+            Console.WriteLine($"\nAll TS results have been successfully saved to '{fileName}'");
+        }
         #endregion
 
 
