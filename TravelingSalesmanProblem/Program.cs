@@ -33,16 +33,18 @@ namespace TravelingSalesmanProblem
 
             // TestSimulatedAnnealing();
 
-            // TestTabuSearch();
+           //  TestTabuSearch();
 
 
             //Odpala to Kazik: 
             // Po skończeniu szukajcie pliku: TabuSearchKazik_Results.xlsx (wyślij go mi na messanger)
-           // TestTabuSearchKazik();
+            // TestTabuSearchKazik();
 
             //Odpala to Rafał:
             // Po skończeniu szukajcie pliku: TabuSearchRafal_Results.xlsx (wyślij go mi na messanger)
             //TestTabuSearchRafal();
+
+            TestAntColonyOptimization();
 
             Console.WriteLine("\nPress any key to exit.");
             Console.ReadKey();
@@ -773,6 +775,141 @@ namespace TravelingSalesmanProblem
 
             Console.WriteLine($"\nAll TS results have been successfully saved to '{fileName}'");
         }
+        #endregion
+
+        #region AntColonyOptimizationAlgorithm
+        public static (TSP bestRoute, TimeSpan duration) RunAntColonyOptimization(double[,] dataCities, int numAnts, double alpha, double beta, double rho, int maxIterations)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+
+            Console.WriteLine($"\n--- Running Ant Colony Optimization: Ants={numAnts}, Alpha={alpha:F1}, Beta={beta:F1}, Rho={rho:F2}, Iter={maxIterations} ---");
+
+            // Inicjalizacja algorytmu ACO
+            AntColonyOptimization acoSolver = new AntColonyOptimization(dataCities, numAnts, alpha, beta, rho);
+
+            stopwatch.Start();
+
+            // Uruchomienie głównej metody algorytmu
+            TSP bestRoute = acoSolver.Solve(maxIterations);
+
+            stopwatch.Stop();
+
+            Console.WriteLine($"Final Best Route (ACO): {bestRoute.Cost:F2}");
+            Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalMilliseconds:F2} ms");
+            Console.WriteLine(new string('-', 50));
+
+            return (bestRoute, stopwatch.Elapsed);
+        }
+
+        public static void TestAntColonyOptimization()
+        {
+            // Parametryzacja algorytmu Kolonii Mrówek (ACO)
+            int[] numAnts = { 10, 20, 50 };                      // Liczba mrówek
+            double[] alphas = { 1.0, 2.0, 5.0 };                   // Waga feromonu (alpha)
+            double[] betas = { 2.0, 5.0, 7.0 };                    // Waga heurystyki (beta)
+            double[] rhos = { 0.1, 0.5, 0.8 };                     // Współczynnik parowania (rho)
+            int maxIterations = 700;                         // Liczba iteracji
+            const int MultiStartCount = 10;                  // Wielokrotne uruchomienie
+
+            var datasets = new Dictionary<string, double[,]>
+            {
+                { "48_Cities", dataCities48 },
+                { "76_Cities", dataCities76 },
+                { "127_Cities", dataCities127 }
+            };
+
+            string fileName = "AntColonyOptimization_Results.xlsx";
+            using (var workbook = new XLWorkbook())
+            {
+                foreach (var datasetEntry in datasets)
+                {
+                    string datasetName = datasetEntry.Key;
+                    double[,] cityData = datasetEntry.Value;
+                    var allResults = new List<ResultData>();
+                    List<int> mockList = Enumerable.Range(0, cityData.GetLength(0)).ToList();
+
+                    Console.WriteLine($"\n===== STARTING ACO TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    foreach (var m in numAnts)
+                    {
+                        foreach (var alpha in alphas)
+                        {
+                            foreach (var beta in betas)
+                            {
+                                foreach (var rho in rhos)
+                                {
+                                    TSP bestResultRoute = new TSP(mockList, double.MaxValue);
+                                    double totalTimeMs = 0;
+
+                                    Console.WriteLine($"\n--- Testing: Ants={m}, Alpha={alpha}, Beta={beta}, Rho={rho} ---");
+
+                                    // Wielokrotny start (Multi-start)
+                                    for (int i = 0; i < MultiStartCount; i++)
+                                    {
+                                        var (resultRoute, duration) = RunAntColonyOptimization(
+                                            cityData, m, alpha, beta, rho, maxIterations);
+
+                                        totalTimeMs += duration.TotalMilliseconds;
+
+                                        if (resultRoute != null && bestResultRoute.Cost > resultRoute.Cost)
+                                        {
+                                            bestResultRoute = resultRoute;
+                                        }
+                                    }
+
+                                    double averageTimeMs = totalTimeMs / MultiStartCount;
+
+                                    if (bestResultRoute != null)
+                                    {
+                                        allResults.Add(new ResultData
+                                        {
+                                            Method = "AntColonyOptimization",
+                                            NumAnts = m,
+                                            Alpha = alpha,
+                                            Beta = beta,
+                                            Rho = rho,
+                                            MaxIterations = maxIterations,
+                                            RouteCost = bestResultRoute.Cost,
+                                            ExecutionTimeMs = averageTimeMs
+                                        });
+                                        Console.WriteLine($"\n-> Best Run for M={m}, a={alpha}, b={beta}, r={rho}: Cost={bestResultRoute.Cost:F2}, AvgTime={averageTimeMs:F2} ms");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Console.WriteLine($"\n===== FINISHED ACO TESTS FOR {datasetName.Replace('_', ' ')} DATASET =====");
+
+                    // Zapis wyników do arkusza Excel
+                    var worksheet = workbook.Worksheets.Add($"ACO_Results_{datasetName}");
+
+                    worksheet.Cell(1, 1).InsertTable(allResults.Select(r => new
+                    {
+                        Algorithm = r.Method,
+                        NumAnts = r.NumAnts,
+                        Alpha = r.Alpha,
+                        Beta = r.Beta,
+                        Rho = r.Rho,
+                        MaxIterations = r.MaxIterations,
+                        FinalRouteCost = r.RouteCost,
+                        AvgExecutionTimeMs = r.ExecutionTimeMs
+                    }));
+
+                    // Formatowanie nagłówka
+                    var headerRange = worksheet.Range(1, 1, 1, 8);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    worksheet.Columns().AdjustToContents();
+                }
+
+                workbook.SaveAs(fileName);
+            }
+
+            Console.WriteLine($"\nAll ACO results have been successfully saved to '{fileName}'");
+        }
+
         #endregion
 
 

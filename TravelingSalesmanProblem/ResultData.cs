@@ -22,6 +22,12 @@ namespace TravelingSalesmanProblem
         // Tabu Search (TS)
         public int? TabuListLength { get; set;}
 
+        // Ant Colony Optimization (ACO)
+        public int? NumAnts { get; set; }   // (M)
+        public double? Alpha { get; set; }  // (α)
+        public double? Beta { get; set; }   // (β)
+        public double? Rho { get; set; }    // (ρ)
+
         // Scores
         public double? RouteCost { get; set; }
         public double? ExecutionTimeMs { get; set; }
